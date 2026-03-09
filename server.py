@@ -299,5 +299,7 @@ if __name__ == "__main__":
     if not SHOPIFY_ACCESS_TOKEN or not SHOPIFY_STORE_URL:
         print("ERROR: Set SHOPIFY_ACCESS_TOKEN and SHOPIFY_STORE_URL environment variables.")
         exit(1)
+    import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=port, path="/mcp")
+    app = mcp.streamable_http_app(path="/mcp")
+    uvicorn.run(app, host="0.0.0.0", port=port)
