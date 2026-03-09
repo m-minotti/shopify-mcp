@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import BaseModel, ConfigDict, Field
 
 # ── Configuration ────────────────────────────────────────────────────────────
@@ -23,7 +24,13 @@ BASE_URL = f"https://{SHOPIFY_STORE_URL}/admin/api/{API_VERSION}"
 # RAILWAY_PUBLIC_DOMAIN is set automatically by Railway
 _host = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
 _allowed_hosts = [_host, f"www.{_host}", "localhost", "127.0.0.1"] if _host else ["*"]
-mcp = FastMCP("shopify_mcp", stateless_http=True)
+mcp = FastMCP(
+    "shopify_mcp",
+    stateless_http=True,
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+    )
+)
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -302,11 +309,23 @@ if __name__ == "__main__":
     if not SHOPIFY_ACCESS_TOKEN or not SHOPIFY_STORE_URL:
         print("ERROR: Set SHOPIFY_ACCESS_TOKEN and SHOPIFY_STORE_URL environment variables.")
         exit(1)
+
     import uvicorn
+
+    # Monkey-patch FastMCP's internal host validation to allow Railway's proxy
+    try:
+        import mcp.server.streamable_http as _sh
+        import inspect
+        for _cls_name, _cls in inspect.getmembers(_sh, inspect.isclass):
+            if hasattr(_cls, '_check_host'):
+                async def _noop(self, scope): pass
+                setattr(_cls, '_check_host', _noop)
+                print(f"Patched host check on {_cls_name}")
+    except Exception as e:
+        print(f"Patch warning: {e}")
+
     port = int(os.environ.get("PORT", 8000))
     app = mcp.streamable_http_app()
-    from starlette.middleware.trustedhost import TrustedHostMiddleware
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
     uvicorn.run(
         app,
         host="0.0.0.0",
