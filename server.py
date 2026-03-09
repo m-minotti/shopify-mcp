@@ -20,6 +20,9 @@ BASE_URL = f"https://{SHOPIFY_STORE_URL}/admin/api/{API_VERSION}"
 
 # ── FastMCP Server ────────────────────────────────────────────────────────────
 
+# RAILWAY_PUBLIC_DOMAIN is set automatically by Railway
+_host = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+_allowed_hosts = [_host, f"www.{_host}", "localhost", "127.0.0.1"] if _host else ["*"]
 mcp = FastMCP("shopify_mcp", stateless_http=True)
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -302,6 +305,8 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     app = mcp.streamable_http_app()
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
     uvicorn.run(
         app,
         host="0.0.0.0",
